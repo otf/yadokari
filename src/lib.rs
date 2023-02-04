@@ -1,4 +1,5 @@
 use axum::{
+    extract::State,
     response::IntoResponse,
     routing::{get, post},
     Json, Router,
@@ -6,8 +7,14 @@ use axum::{
 use dotenv::dotenv;
 use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
+use shuttle_secrets::SecretStore;
 use std::env;
 use sync_wrapper::SyncWrapper;
+
+#[derive(Clone)]
+struct AppState {
+    verification_token: String,
+}
 
 #[derive(Serialize)]
 struct PostMessageRequest {
@@ -27,10 +34,8 @@ struct ChallengeResponse {
     challenge: Option<String>,
 }
 
-async fn challenge(Json(req): Json<ChallengeRequest>) -> impl IntoResponse {
-    let verification_token = env::var("VERIFICATION_TOKEN").unwrap();
-
-    if req.token != verification_token {
+async fn challenge(state: State<AppState>, Json(req): Json<ChallengeRequest>) -> impl IntoResponse {
+    if req.token != state.verification_token {
         tracing::warn!("AuthenticationFailed, token {}", req.token);
         let res = Json(ChallengeResponse {
             ok: false,
@@ -70,10 +75,18 @@ async fn post_message() -> impl IntoResponse {
 }
 
 #[shuttle_service::main]
-async fn axum() -> shuttle_service::ShuttleAxum {
+async fn axum(
+    #[shuttle_secrets::Secrets] secret_store: SecretStore,
+) -> shuttle_service::ShuttleAxum {
+    let app_state = AppState {
+        verification_token: secret_store.get("VERIFICATION_TOKEN").unwrap(),
+    };
+
     let router = Router::new()
         .route("/challenge", post(challenge))
-        .route("/post", get(post_message));
+        .route("/post", get(post_message))
+        .with_state(app_state);
+
     let sync_wrapper = SyncWrapper::new(router);
 
     Ok(sync_wrapper)
