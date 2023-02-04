@@ -111,7 +111,7 @@ fn bukkens_to_blocks(bukkens: &Vec<Bukken>) -> Value {
             json!({ "type": "divider" }),
         ])
         .collect::<Vec<_>>();
-        json!(bukken_blocks)
+    json!(bukken_blocks)
 }
 
 async fn post_events(state: State<AppState>, Json(req): Json<EventRequest>) -> impl IntoResponse {
@@ -128,7 +128,7 @@ async fn post_events(state: State<AppState>, Json(req): Json<EventRequest>) -> i
                 if ev.user != state.bot_user {
                     let bukkens = retrieve_bukken_list().await.unwrap();
                     let bukken_blocks = bukkens_to_blocks(&bukkens);
-                    post_message(&state.bot_user_oauth_token, ev, &json!(bukken_blocks)).await.unwrap();
+                    post_message(&state.bot_user_oauth_token, ev, &bukken_blocks).await.unwrap();
                 }
             }
             None => {}
