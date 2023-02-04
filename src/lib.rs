@@ -21,6 +21,7 @@ struct PostMessageRequest {
 struct Event {
     channel: String,
     user: String,
+    #[allow(dead_code)]
     text: String,
 }
 
@@ -37,6 +38,42 @@ struct EventResponse {
     challenge: Option<String>,
 }
 
+#[derive(Deserialize, Serialize, Debug)]
+#[allow(dead_code)]
+struct Bukken {
+    bukken_id: String,
+    bukken_name: String,
+    bukken_link: String,
+    image: String,
+    rent_normal: String,
+    rent_waribiki: String,
+    commonfee_normal: String,
+    commonfee_waribiki: String,
+    span: String,
+    r#type: String,
+    floorspace: String,
+    floor: String,
+    floor_max: String,
+    access: String,
+    tokubetsu_kbn_text: String,
+    tokubetsu_kbn: String,
+    rowspan: String,
+    shikutyoson_name: String,
+}
+
+async fn get_bukken_list() -> Vec<Bukken> {
+    let client = reqwest::Client::new();
+    client
+        .post("https://chintai.sumai.ur-net.go.jp/chintai/api/tokubetsu/list_tokubetsu")
+        .form(&[("tdfk", "23", ("is_sp", false))])
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap()
+}
+
 async fn post_events(state: State<AppState>, Json(req): Json<EventRequest>) -> impl IntoResponse {
     if req.token != state.verification_token {
         tracing::warn!("AuthenticationFailed, token {}", req.token);
@@ -50,7 +87,13 @@ async fn post_events(state: State<AppState>, Json(req): Json<EventRequest>) -> i
             Some(ev) => {
                 if ev.user != state.bot_user {
                     tracing::info!("{:#?}", ev);
-                    post_echo(&state.bot_user_oauth_token, ev).await;
+                    let bukkens = get_bukken_list().await;
+                    post_message(
+                        &state.bot_user_oauth_token,
+                        ev,
+                        serde_json::to_string(&bukkens).unwrap().as_str(),
+                    )
+                    .await;
                 }
             }
             None => {}
@@ -63,14 +106,14 @@ async fn post_events(state: State<AppState>, Json(req): Json<EventRequest>) -> i
     }
 }
 
-async fn post_echo(token: &String, ev: &Event) {
+async fn post_message(token: &String, ev: &Event, text: &str) {
     let client = reqwest::Client::new();
     let post = PostMessageRequest {
-        text: ev.text.clone(),
+        text: text.to_owned(),
         channel: ev.channel.clone(),
     };
 
-    let res = client
+    let _res = client
         .post("https://slack.com/api/chat.postMessage")
         .bearer_auth(&token)
         .json(&post)
