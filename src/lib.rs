@@ -16,7 +16,7 @@ struct PostMessageRequest {
     channel: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 struct Event {
     channel: String,
     user: String,
@@ -47,8 +47,9 @@ async fn post_events(state: State<AppState>, Json(req): Json<EventRequest>) -> i
     } else {
         match &req.event {
             Some(ev) => {
-                if ev.user != "yadokari" {
-                    post_echo(&state.bot_user_oauth_token, ev).await;
+                if ev.user != "@yadokari" {
+                    tracing::info!("{:#?}", ev);
+                    //post_echo(&state.bot_user_oauth_token, ev).await;
                 }
             }
             None => {}
