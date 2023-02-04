@@ -88,6 +88,7 @@ async fn post_events(state: State<AppState>, Json(req): Json<EventRequest>) -> i
                 if ev.user != state.bot_user {
                     tracing::info!("{:#?}", ev);
                     let bukkens = get_bukken_list().await;
+                    tracing::info!("{:#?}", bukkens);
                     post_message(
                         &state.bot_user_oauth_token,
                         ev,
