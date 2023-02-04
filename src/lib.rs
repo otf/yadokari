@@ -64,7 +64,7 @@ async fn get_bukken_list() -> Vec<Bukken> {
     let client = reqwest::Client::new();
     client
         .post("https://chintai.sumai.ur-net.go.jp/chintai/api/tokubetsu/list_tokubetsu")
-        .form(&[("tdfk", "23", ("is_sp", false))])
+        .form(&[("tdfk", 23, ("is_sp", false))])
         .send()
         .await
         .unwrap()
