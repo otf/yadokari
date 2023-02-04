@@ -63,7 +63,7 @@ struct Bukken {
     shikutyoson_name: String,
 }
 
-async fn get_bukken_list() -> reqwest::Result<Vec<Bukken>> {
+async fn retrieve_bukken_list() -> reqwest::Result<Vec<Bukken>> {
     let client = reqwest::Client::new();
     let mut params = HashMap::new();
     params.insert("tdfk", "13"); // 東京
@@ -126,7 +126,7 @@ async fn post_events(state: State<AppState>, Json(req): Json<EventRequest>) -> i
         match &req.event {
             Some(ev) => {
                 if ev.user != state.bot_user {
-                    let bukkens = get_bukken_list().await.unwrap();
+                    let bukkens = retrieve_bukken_list().await.unwrap();
                     let bukken_blocks = bukkens_to_blocks(&bukkens);
                     post_message(&state.bot_user_oauth_token, ev, &json!(bukken_blocks)).await.unwrap();
                 }
