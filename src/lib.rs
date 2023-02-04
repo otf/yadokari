@@ -8,6 +8,7 @@ use sync_wrapper::SyncWrapper;
 struct AppState {
     verification_token: String,
     bot_user_oauth_token: String,
+    bot_user: String,
 }
 
 #[derive(Serialize)]
@@ -47,9 +48,9 @@ async fn post_events(state: State<AppState>, Json(req): Json<EventRequest>) -> i
     } else {
         match &req.event {
             Some(ev) => {
-                if ev.user != "@yadokari" {
+                if ev.user != state.bot_user {
                     tracing::info!("{:#?}", ev);
-                    //post_echo(&state.bot_user_oauth_token, ev).await;
+                    post_echo(&state.bot_user_oauth_token, ev).await;
                 }
             }
             None => {}
@@ -88,6 +89,7 @@ async fn axum(
     let app_state = AppState {
         verification_token: secret_store.get("VERIFICATION_TOKEN").unwrap(),
         bot_user_oauth_token: secret_store.get("BOT_USER_OAUTH_TOKEN").unwrap(),
+        bot_user: secret_store.get("BOT_USER").unwrap(),
     };
 
     let router = Router::new()
