@@ -1,6 +1,9 @@
+use std::collections::HashMap;
+
 use axum::{extract::State, response::IntoResponse, routing::post, Json, Router};
 use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
 use shuttle_secrets::SecretStore;
 use sync_wrapper::SyncWrapper;
 
@@ -13,7 +16,7 @@ struct AppState {
 
 #[derive(Serialize)]
 struct PostMessageRequest {
-    text: String,
+    blocks: Value,
     channel: String,
 }
 
@@ -62,9 +65,12 @@ struct Bukken {
 
 async fn get_bukken_list() -> Vec<Bukken> {
     let client = reqwest::Client::new();
+    let mut params = HashMap::new();
+    params.insert("tdfk", "13"); // 東京
+    params.insert("is_sp", "false");
     client
         .post("https://chintai.sumai.ur-net.go.jp/chintai/api/tokubetsu/list_tokubetsu")
-        .form(&[("tdfk", 23, ("is_sp", false))])
+        .form(&params)
         .send()
         .await
         .unwrap()
@@ -85,15 +91,42 @@ async fn post_events(state: State<AppState>, Json(req): Json<EventRequest>) -> i
         match &req.event {
             Some(ev) => {
                 if ev.user != state.bot_user {
-                    tracing::info!("{:#?}", ev);
                     let bukkens = get_bukken_list().await;
-                    tracing::info!("{:#?}", bukkens);
-                    post_message(
-                        &state.bot_user_oauth_token,
-                        ev,
-                        serde_json::to_string(&bukkens).unwrap().as_str(),
-                    )
-                    .await;
+                    let bukken_blocks = bukkens
+                        .into_iter()
+                        .take(3) // todo: 50ブロックになるように分けて投稿する。
+                        .flat_map(|bukken| 
+                            [ json!({ "type": "divider" }),
+                            json!({
+                                    "type": "section",
+                                    "text": {
+                                        "type": "mrkdwn",
+                                        "text": format!("*<https://www.ur-net.go.jp{}|{}>*", bukken.bukken_link, bukken.bukken_name),
+                                    },
+                                    "accessory": {
+                                        "type": "image",
+                                        "image_url": bukken.image,
+                                        "alt_text": bukken.bukken_name,
+                                    }
+                            }),
+                            json!({
+                                "type": "section",
+                                "fields": [
+                                    {
+                                        "type": "mrkdwn",
+                                        "text": format!("*通常家賃(共益費):*\n{}{}", bukken.rent_normal, bukken.commonfee_normal),
+                                    },
+                                    {
+                                        "type": "mrkdwn",
+                                        "text": format!("*割引後家賃(共益費):*\n{}{}", bukken.rent_waribiki, bukken.commonfee_waribiki),
+                                    },
+                                ]
+                            }),
+                            json!({ "type": "divider" }),
+                        ])
+                        .collect::<Vec<_>>();
+                    tracing::info!("{:#?}", json!(bukken_blocks));
+                    post_message(&state.bot_user_oauth_token, ev, &json!(bukken_blocks)).await;
                 }
             }
             None => {}
@@ -106,14 +139,14 @@ async fn post_events(state: State<AppState>, Json(req): Json<EventRequest>) -> i
     }
 }
 
-async fn post_message(token: &String, ev: &Event, text: &str) {
+async fn post_message(token: &String, ev: &Event, blocks: &Value) {
     let client = reqwest::Client::new();
     let post = PostMessageRequest {
-        text: text.to_owned(),
+        blocks: blocks.clone(),
         channel: ev.channel.clone(),
     };
 
-    let _res = client
+    let res = client
         .post("https://slack.com/api/chat.postMessage")
         .bearer_auth(&token)
         .json(&post)
@@ -123,6 +156,7 @@ async fn post_message(token: &String, ev: &Event, text: &str) {
         .text()
         .await
         .unwrap();
+    tracing::info!("{:#?}", res);
 }
 
 #[shuttle_service::main]
