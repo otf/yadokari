@@ -48,7 +48,7 @@ async fn post_events(state: State<AppState>, Json(req): Json<EventRequest>) -> i
         match &req.event {
             Some(ev) => {
                 if ev.user != "yadokari" {
-                    post_hi(&state.bot_user_oauth_token).await;
+                    post_echo(&state.bot_user_oauth_token, ev).await;
                 }
             }
             None => {}
@@ -61,11 +61,11 @@ async fn post_events(state: State<AppState>, Json(req): Json<EventRequest>) -> i
     }
 }
 
-async fn post_hi(token: &String) {
+async fn post_echo(token: &String, ev: &Event) {
     let client = reqwest::Client::new();
     let post = PostMessageRequest {
-        text: "hi".to_owned(),
-        channel: "#bot-test".to_owned(),
+        text: ev.text.clone(),
+        channel: ev.channel.clone(),
     };
 
     let res = client
