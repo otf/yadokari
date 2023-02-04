@@ -63,7 +63,7 @@ struct Bukken {
     shikutyoson_name: String,
 }
 
-async fn get_bukken_list() -> Vec<Bukken> {
+async fn get_bukken_list() -> reqwest::Result<Vec<Bukken>> {
     let client = reqwest::Client::new();
     let mut params = HashMap::new();
     params.insert("tdfk", "13"); // 東京
@@ -72,11 +72,46 @@ async fn get_bukken_list() -> Vec<Bukken> {
         .post("https://chintai.sumai.ur-net.go.jp/chintai/api/tokubetsu/list_tokubetsu")
         .form(&params)
         .send()
-        .await
-        .unwrap()
+        .await?
         .json()
         .await
-        .unwrap()
+}
+
+fn bukkens_to_blocks(bukkens: &Vec<Bukken>) -> Value {
+    let bukken_blocks = bukkens
+        .into_iter()
+        .take(3) // todo: 50ブロックになるように分けて投稿する。
+        .flat_map(|bukken| 
+            [ json!({ "type": "divider" }),
+            json!({
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": format!("*<https://www.ur-net.go.jp{}|{}>*", bukken.bukken_link, bukken.bukken_name),
+                    },
+                    "accessory": {
+                        "type": "image",
+                        "image_url": bukken.image,
+                        "alt_text": bukken.bukken_name,
+                    }
+            }),
+            json!({
+                "type": "section",
+                "fields": [
+                    {
+                        "type": "mrkdwn",
+                        "text": format!("*通常家賃(共益費):*\n{}{}", bukken.rent_normal, bukken.commonfee_normal),
+                    },
+                    {
+                        "type": "mrkdwn",
+                        "text": format!("*割引後家賃(共益費):*\n{}{}", bukken.rent_waribiki, bukken.commonfee_waribiki),
+                    },
+                ]
+            }),
+            json!({ "type": "divider" }),
+        ])
+        .collect::<Vec<_>>();
+        json!(bukken_blocks)
 }
 
 async fn post_events(state: State<AppState>, Json(req): Json<EventRequest>) -> impl IntoResponse {
@@ -91,42 +126,9 @@ async fn post_events(state: State<AppState>, Json(req): Json<EventRequest>) -> i
         match &req.event {
             Some(ev) => {
                 if ev.user != state.bot_user {
-                    let bukkens = get_bukken_list().await;
-                    let bukken_blocks = bukkens
-                        .into_iter()
-                        .take(3) // todo: 50ブロックになるように分けて投稿する。
-                        .flat_map(|bukken| 
-                            [ json!({ "type": "divider" }),
-                            json!({
-                                    "type": "section",
-                                    "text": {
-                                        "type": "mrkdwn",
-                                        "text": format!("*<https://www.ur-net.go.jp{}|{}>*", bukken.bukken_link, bukken.bukken_name),
-                                    },
-                                    "accessory": {
-                                        "type": "image",
-                                        "image_url": bukken.image,
-                                        "alt_text": bukken.bukken_name,
-                                    }
-                            }),
-                            json!({
-                                "type": "section",
-                                "fields": [
-                                    {
-                                        "type": "mrkdwn",
-                                        "text": format!("*通常家賃(共益費):*\n{}{}", bukken.rent_normal, bukken.commonfee_normal),
-                                    },
-                                    {
-                                        "type": "mrkdwn",
-                                        "text": format!("*割引後家賃(共益費):*\n{}{}", bukken.rent_waribiki, bukken.commonfee_waribiki),
-                                    },
-                                ]
-                            }),
-                            json!({ "type": "divider" }),
-                        ])
-                        .collect::<Vec<_>>();
-                    tracing::info!("{:#?}", json!(bukken_blocks));
-                    post_message(&state.bot_user_oauth_token, ev, &json!(bukken_blocks)).await;
+                    let bukkens = get_bukken_list().await.unwrap();
+                    let bukken_blocks = bukkens_to_blocks(&bukkens);
+                    post_message(&state.bot_user_oauth_token, ev, &json!(bukken_blocks)).await.unwrap();
                 }
             }
             None => {}
@@ -139,24 +141,21 @@ async fn post_events(state: State<AppState>, Json(req): Json<EventRequest>) -> i
     }
 }
 
-async fn post_message(token: &String, ev: &Event, blocks: &Value) {
+async fn post_message(token: &String, ev: &Event, blocks: &Value) -> reqwest::Result<String> {
     let client = reqwest::Client::new();
     let post = PostMessageRequest {
         blocks: blocks.clone(),
         channel: ev.channel.clone(),
     };
 
-    let res = client
+    client
         .post("https://slack.com/api/chat.postMessage")
         .bearer_auth(&token)
         .json(&post)
         .send()
-        .await
-        .unwrap()
+        .await?
         .text()
         .await
-        .unwrap();
-    tracing::info!("{:#?}", res);
 }
 
 #[shuttle_service::main]
