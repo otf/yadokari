@@ -57,7 +57,6 @@ struct Bukken {
     access: String,
     tokubetsu_kbn_text: String,
     tokubetsu_kbn: String,
-    rowspan: String,
     shikutyoson_name: String,
 }
 
