@@ -1,19 +1,13 @@
-use axum::{
-    extract::State,
-    response::IntoResponse,
-    routing::{get, post},
-    Json, Router,
-};
-use dotenv::dotenv;
+use axum::{extract::State, response::IntoResponse, routing::post, Json, Router};
 use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 use shuttle_secrets::SecretStore;
-use std::env;
 use sync_wrapper::SyncWrapper;
 
 #[derive(Clone)]
 struct AppState {
     verification_token: String,
+    bot_user_oauth_token: String,
 }
 
 #[derive(Serialize)]
@@ -23,27 +17,43 @@ struct PostMessageRequest {
 }
 
 #[derive(Deserialize)]
-struct ChallengeRequest {
+struct Event {
+    channel: String,
+    user: String,
+    text: String,
+}
+
+#[derive(Deserialize)]
+struct EventRequest {
     token: String,
     challenge: Option<String>,
+    event: Option<Event>,
 }
 
 #[derive(Serialize)]
-struct ChallengeResponse {
+struct EventResponse {
     ok: bool,
     challenge: Option<String>,
 }
 
-async fn challenge(state: State<AppState>, Json(req): Json<ChallengeRequest>) -> impl IntoResponse {
+async fn post_events(state: State<AppState>, Json(req): Json<EventRequest>) -> impl IntoResponse {
     if req.token != state.verification_token {
         tracing::warn!("AuthenticationFailed, token {}", req.token);
-        let res = Json(ChallengeResponse {
+        let res = Json(EventResponse {
             ok: false,
             challenge: None,
         });
         (StatusCode::BAD_REQUEST, res)
     } else {
-        let res = Json(ChallengeResponse {
+        match &req.event {
+            Some(ev) => {
+                if ev.user != "yadokari" {
+                    post_hi(&state.bot_user_oauth_token).await;
+                }
+            }
+            None => {}
+        }
+        let res = Json(EventResponse {
             ok: true,
             challenge: req.challenge,
         });
@@ -51,9 +61,7 @@ async fn challenge(state: State<AppState>, Json(req): Json<ChallengeRequest>) ->
     }
 }
 
-async fn post_message() -> impl IntoResponse {
-    dotenv().unwrap();
-    let token = env::var("SLACK_BOT_TOKEN").unwrap();
+async fn post_hi(token: &String) {
     let client = reqwest::Client::new();
     let post = PostMessageRequest {
         text: "hi".to_owned(),
@@ -70,8 +78,6 @@ async fn post_message() -> impl IntoResponse {
         .text()
         .await
         .unwrap();
-
-    (StatusCode::OK, res)
 }
 
 #[shuttle_service::main]
@@ -80,11 +86,11 @@ async fn axum(
 ) -> shuttle_service::ShuttleAxum {
     let app_state = AppState {
         verification_token: secret_store.get("VERIFICATION_TOKEN").unwrap(),
+        bot_user_oauth_token: secret_store.get("BOT_USER_OAUTH_TOKEN").unwrap(),
     };
 
     let router = Router::new()
-        .route("/challenge", post(challenge))
-        .route("/post", get(post_message))
+        .route("/events", post(post_events))
         .with_state(app_state);
 
     let sync_wrapper = SyncWrapper::new(router);
