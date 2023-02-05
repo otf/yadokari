@@ -117,7 +117,7 @@ fn bukkens_to_blocks(bukkens: &Vec<Bukken>) -> Value {
                     "type": "section",
                     "text": {
                         "type": "mrkdwn",
-                        "text": format!("*<https://www.ur-net.go.jp{}|{}>*", bukken.bukken_link, bukken.bukken_name),
+                        "text": format!("*<https://www.ur-net.go.jp{}|{}>*\n{}", bukken.bukken_link, bukken.bukken_name, bukken.access.replace("<br>", "\n")),
                     },
                     "accessory": {
                         "type": "image",
@@ -135,6 +135,14 @@ fn bukkens_to_blocks(bukkens: &Vec<Bukken>) -> Value {
                     {
                         "type": "mrkdwn",
                         "text": format!("*割引後家賃(共益費):*\n{}{}", bukken.rent_waribiki, bukken.commonfee_waribiki),
+                    },
+                    {
+                        "type": "mrkdwn",
+                        "text": format!("*間取り/床面積:*\n{} / {}", bukken.r#type, bukken.floorspace.replace("&#13217;", "㎡")),
+                    },
+                    {
+                        "type": "mrkdwn",
+                        "text": format!("*住宅種類:*\n{}", bukken.tokubetsu_kbn_text),
                     },
                 ]
             }),
