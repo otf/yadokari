@@ -65,7 +65,7 @@ struct Bukken {
 async fn retrieve_bukken_list(tdfk: &str) -> reqwest::Result<Vec<Bukken>> {
     let client = reqwest::Client::new();
     let mut params = HashMap::new();
-    params.insert("tdfk", tdfk); // 東京
+    params.insert("tdfk", tdfk);
     params.insert("is_sp", "false");
     client
         .post("https://chintai.sumai.ur-net.go.jp/chintai/api/tokubetsu/list_tokubetsu")
