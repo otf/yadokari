@@ -5,10 +5,12 @@ use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use shuttle_secrets::SecretStore;
+use sqlx::PgPool;
 use sync_wrapper::SyncWrapper;
 
 #[derive(Clone)]
 struct AppState {
+    pool: PgPool,
     verification_token: String,
     bot_user_oauth_token: String,
     bot_user: String,
@@ -195,9 +197,11 @@ async fn post_message(token: &String, ev: &Event, blocks: &Value) {
 
 #[shuttle_service::main]
 async fn axum(
+    #[shuttle_shared_db::Postgres] pool: PgPool,
     #[shuttle_secrets::Secrets] secret_store: SecretStore,
 ) -> shuttle_service::ShuttleAxum {
     let app_state = AppState {
+        pool,
         verification_token: secret_store.get("VERIFICATION_TOKEN").unwrap(),
         bot_user_oauth_token: secret_store.get("BOT_USER_OAUTH_TOKEN").unwrap(),
         bot_user: secret_store.get("BOT_USER").unwrap(),
