@@ -1,6 +1,6 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, future::Future, pin::Pin};
 
-use axum::{extract::State, response::IntoResponse, routing::post, Json, Router};
+use axum::{async_trait, extract::{State, FromRequest}, response::{IntoResponse, Response}, routing::post, Json, Router, BoxError, body::HttpBody, http::Request};
 use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -33,12 +33,6 @@ struct EventRequest {
     token: String,
     challenge: Option<String>,
     event: Option<Event>,
-}
-
-#[derive(Serialize)]
-struct EventResponse {
-    ok: bool,
-    challenge: Option<String>,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -75,6 +69,42 @@ async fn retrieve_bukken_list() -> reqwest::Result<Vec<Bukken>> {
         .await?
         .json()
         .await
+}
+
+#[async_trait]
+impl<B> FromRequest<AppState, B> for Event
+where
+    B: HttpBody + Send + 'static,
+    B::Data: Send,
+    B::Error: Into<BoxError>,
+{
+    type Rejection = (StatusCode, Json<Value>);
+
+    async fn from_request(req: Request<B>, state:&AppState) -> Result<Self, Self::Rejection> {
+        let Json(req) = Json::<EventRequest>::from_request(req, state).await
+        .map_err(|rejection| {
+            let res = Json(json!({
+                "error": format!("Json parsing failed, rejection: {}", rejection),
+            }));
+            (StatusCode::BAD_REQUEST, res)
+        })?;
+
+        if req.token != state.verification_token {
+            tracing::warn!("Authentication failed, token: {}", req.token);
+            let res = Json(json!({
+                "ok": false,
+            }));
+            Err((StatusCode::BAD_REQUEST, res))
+        } else {
+            req.event.ok_or({
+                let res = Json(json!({
+                    "ok": true,
+                    "challenge": req.challenge
+                }));
+                (StatusCode::OK, res)
+            })
+        }
+    }
 }
 
 fn bukkens_to_blocks(bukkens: &Vec<Bukken>) -> Value {
@@ -114,48 +144,45 @@ fn bukkens_to_blocks(bukkens: &Vec<Bukken>) -> Value {
     json!(bukken_blocks)
 }
 
-async fn post_events(state: State<AppState>, Json(req): Json<EventRequest>) -> impl IntoResponse {
-    if req.token != state.verification_token {
-        tracing::warn!("AuthenticationFailed, token {}", req.token);
-        let res = Json(EventResponse {
-            ok: false,
-            challenge: None,
-        });
-        (StatusCode::BAD_REQUEST, res)
-    } else {
-        match &req.event {
-            Some(ev) => {
-                if ev.user != state.bot_user {
-                    let bukkens = retrieve_bukken_list().await.unwrap();
-                    let bukken_blocks = bukkens_to_blocks(&bukkens);
-                    post_message(&state.bot_user_oauth_token, ev, &bukken_blocks).await.unwrap();
-                }
-            }
-            None => {}
-        }
-        let res = Json(EventResponse {
-            ok: true,
-            challenge: req.challenge,
-        });
-        (StatusCode::OK, res)
+struct SlackTask(Pin<Box<dyn Future<Output =()> + Send + 'static>>);
+
+impl IntoResponse for SlackTask {
+    fn into_response(self: Self) -> Response{
+        tokio::spawn(self.0);
+        let res = Json(json!({
+            "ok": true,
+        }));
+        (StatusCode::OK, res).into_response()
     }
 }
 
-async fn post_message(token: &String, ev: &Event, blocks: &Value) -> reqwest::Result<String> {
+async fn post_events(state: State<AppState>, ev: Event) -> impl IntoResponse {
+    SlackTask(Box::pin(async move {
+        if ev.user != state.bot_user {
+            let bukkens = retrieve_bukken_list().await.unwrap();
+            let bukken_blocks = bukkens_to_blocks(&bukkens);
+            post_message(&state.bot_user_oauth_token, &ev, &bukken_blocks).await;
+        }
+    }))
+}
+
+async fn post_message(token: &String, ev: &Event, blocks: &Value) {
     let client = reqwest::Client::new();
     let post = PostMessageRequest {
         blocks: blocks.clone(),
         channel: ev.channel.clone(),
     };
 
-    client
+    let res = client
         .post("https://slack.com/api/chat.postMessage")
         .bearer_auth(&token)
         .json(&post)
         .send()
-        .await?
+        .await
+        .unwrap()
         .text()
         .await
+        .unwrap();
 }
 
 #[shuttle_service::main]
