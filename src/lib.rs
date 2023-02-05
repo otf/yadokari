@@ -161,12 +161,12 @@ fn bukkens_to_blocks(bukkens: Vec<&Bukken>) -> Option<Value> {
 
     let yadokari_blocks = vec![
         json!({
-			"type": "section",
-			"text": {
-				"type": "plain_text",
-				"text": "新しい特別募集住宅を見つけたカリ:eyes:",
-				"emoji": true
-			}
+            "type": "section",
+            "text": {
+                "type": "plain_text",
+                "text": "新しい特別募集住宅を見つけたカリ:eyes:",
+                "emoji": true
+            }
         }),
     ];
     Some(json!(itertools::concat(vec![yadokari_blocks, bukken_blocks])))
