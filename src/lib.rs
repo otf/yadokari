@@ -197,9 +197,14 @@ async fn post_message(token: &String, ev: &Event, blocks: &Value) {
 
 #[shuttle_service::main]
 async fn axum(
-    #[shuttle_shared_db::Postgres] pool: PgPool,
+    #[shuttle_shared_db::Postgres(
+        local_uri = "{secrets.DATABASE_URL}"
+    )] pool: PgPool,
     #[shuttle_secrets::Secrets] secret_store: SecretStore,
 ) -> shuttle_service::ShuttleAxum {
+    std::env::set_var("DATABASE_URL", secret_store.get("DATABASE_URL").unwrap());
+    sqlx::migrate!().run(&pool).await.unwrap();
+
     let app_state = AppState {
         pool,
         verification_token: secret_store.get("VERIFICATION_TOKEN").unwrap(),
