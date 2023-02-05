@@ -1,0 +1,49 @@
+{
+  "db": "PostgreSQL",
+  "675b975ccc51a9f0698455b21a6d0df3eac487fb47f8bb72370e6ba2864accd8": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": []
+      }
+    },
+    "query": "TRUNCATE TABLE bukkens"
+  },
+  "9a73634a174c13c32faa6376f0d7473c6d9b9effa94800440d5122bc8082d65a": {
+    "describe": {
+      "columns": [
+        {
+          "name": "count",
+          "ordinal": 0,
+          "type_info": "Int8"
+        }
+      ],
+      "nullable": [
+        null
+      ],
+      "parameters": {
+        "Left": [
+          "Text",
+          "Text",
+          "Int4"
+        ]
+      }
+    },
+    "query": "\n            SELECT COUNT(*) \n            FROM bukkens \n            WHERE bukken_id = $1\n            AND rent_normal = $2\n            AND rowspan = $3\n        "
+  },
+  "aafaf58f824c3aabcc94ed5112bc6b9b6ef13185ce5f47448b743a93d03089e2": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "Varchar",
+          "Varchar",
+          "Int4"
+        ]
+      }
+    },
+    "query": "\n            INSERT INTO bukkens\n            VALUES ($1, $2, $3)\n            "
+  }
+}
