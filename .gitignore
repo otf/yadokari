@@ -8,5 +8,4 @@
 #/target
 /Cargo.lock
 
-.env
 Secrets.toml
