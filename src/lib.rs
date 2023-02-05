@@ -15,6 +15,7 @@ struct AppState {
     verification_token: String,
     bot_user_oauth_token: String,
     bot_user: String,
+    tdfk: String,
 }
 
 #[derive(Serialize)]
@@ -61,10 +62,10 @@ struct Bukken {
     shikutyoson_name: String,
 }
 
-async fn retrieve_bukken_list() -> reqwest::Result<Vec<Bukken>> {
+async fn retrieve_bukken_list(tdfk: &str) -> reqwest::Result<Vec<Bukken>> {
     let client = reqwest::Client::new();
     let mut params = HashMap::new();
-    params.insert("tdfk", "13"); // 東京
+    params.insert("tdfk", tdfk); // 東京
     params.insert("is_sp", "false");
     client
         .post("https://chintai.sumai.ur-net.go.jp/chintai/api/tokubetsu/list_tokubetsu")
@@ -216,7 +217,7 @@ async fn post_events(state: State<AppState>, ev: Event) -> impl IntoResponse {
     SlackTask(async move {
         if ev.user != state.bot_user {
             let mut conn = state.pool.acquire().await.unwrap();
-            let bukkens = retrieve_bukken_list().await.unwrap();
+            let bukkens = retrieve_bukken_list(&state.tdfk).await.unwrap();
             let fresh_bukkens = filter_fresh(&mut conn, &bukkens).await.unwrap();
             refresh_bukkens(&mut conn, &bukkens).await.unwrap();
             let bukken_blocks = bukkens_to_blocks(fresh_bukkens);
@@ -260,6 +261,7 @@ async fn axum(
         verification_token: secret_store.get("VERIFICATION_TOKEN").unwrap(),
         bot_user_oauth_token: secret_store.get("BOT_USER_OAUTH_TOKEN").unwrap(),
         bot_user: secret_store.get("BOT_USER").unwrap(),
+        tdfk: secret_store.get("TDFK").unwrap(),
     };
 
     let router = Router::new()
