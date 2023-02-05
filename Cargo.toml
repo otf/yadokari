@@ -19,3 +19,4 @@ shuttle-secrets = "0.9.0"
 shuttle-shared-db = { version = "0.9.0", features = ["postgres", "sqlx"] }
 sqlx = { version = "0.6.2", features = ["postgres", "macros"] }
 futures = "0.3.26"
+itertools = "0.10.5"

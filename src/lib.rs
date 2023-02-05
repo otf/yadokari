@@ -112,7 +112,11 @@ where
     }
 }
 
-fn bukkens_to_blocks(bukkens: Vec<&Bukken>) -> Value {
+fn bukkens_to_blocks(bukkens: Vec<&Bukken>) -> Option<Value> {
+    if bukkens.len() == 0 {
+        return None
+    } 
+
     let bukken_blocks = bukkens
         .iter()
         .take(10) // 50ブロックしかSlackに投稿できないので物件数を制限する。
@@ -154,7 +158,18 @@ fn bukkens_to_blocks(bukkens: Vec<&Bukken>) -> Value {
             json!({ "type": "divider" }),
         ])
         .collect::<Vec<_>>();
-    json!(bukken_blocks)
+
+    let yadokari_blocks = vec![
+        json!({
+			"type": "section",
+			"text": {
+				"type": "plain_text",
+				"text": "新しい特別募集住宅を見つけたカリ:eyes:",
+				"emoji": true
+			}
+        }),
+    ];
+    Some(json!(itertools::concat(vec![yadokari_blocks, bukken_blocks])))
 }
 
 struct SlackTask(BoxFuture<'static, ()>);
@@ -220,8 +235,9 @@ async fn post_events(state: State<AppState>, ev: Event) -> impl IntoResponse {
             let bukkens = retrieve_bukken_list(&state.tdfk).await.unwrap();
             let fresh_bukkens = filter_fresh(&mut conn, &bukkens).await.unwrap();
             refresh_bukkens(&mut conn, &bukkens).await.unwrap();
-            let bukken_blocks = bukkens_to_blocks(fresh_bukkens);
-            post_message(&state.bot_user_oauth_token, &ev, &bukken_blocks).await;
+            if let Some(bukken_blocks) = bukkens_to_blocks(fresh_bukkens) {
+                post_message(&state.bot_user_oauth_token, &ev, &bukken_blocks).await;
+            }
         }
     }.boxed())
 }
