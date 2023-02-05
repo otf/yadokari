@@ -1,6 +1,7 @@
-use std::{collections::HashMap, future::Future, pin::Pin};
+use std::{collections::HashMap};
 
 use axum::{async_trait, extract::{State, FromRequest}, response::{IntoResponse, Response}, routing::post, Json, Router, BoxError, body::HttpBody, http::Request};
+use futures::{future::BoxFuture, FutureExt};
 use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -154,7 +155,7 @@ fn bukkens_to_blocks(bukkens: &Vec<Bukken>) -> Value {
     json!(bukken_blocks)
 }
 
-struct SlackTask(Pin<Box<dyn Future<Output =()> + Send + 'static>>);
+struct SlackTask(BoxFuture<'static, ()>);
 
 impl IntoResponse for SlackTask {
     fn into_response(self: Self) -> Response{
@@ -167,13 +168,13 @@ impl IntoResponse for SlackTask {
 }
 
 async fn post_events(state: State<AppState>, ev: Event) -> impl IntoResponse {
-    SlackTask(Box::pin(async move {
+    SlackTask(async move {
         if ev.user != state.bot_user {
             let bukkens = retrieve_bukken_list().await.unwrap();
             let bukken_blocks = bukkens_to_blocks(&bukkens);
             post_message(&state.bot_user_oauth_token, &ev, &bukken_blocks).await;
         }
-    }))
+    }.boxed())
 }
 
 async fn post_message(token: &String, ev: &Event, blocks: &Value) {
