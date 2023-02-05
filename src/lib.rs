@@ -189,13 +189,8 @@ async fn refresh_bukkens(conn: &mut sqlx::PgConnection, bukkens: &Vec<Bukken>) -
         .execute(&mut *conn)
         .await?;
     for bukken in bukkens {
-        sqlx::query!(r#"
-            INSERT INTO bukkens
-            VALUES ($1, $2, $3)
-            "#, 
-            bukken.bukken_id, 
-            bukken.rent_normal, 
-            bukken.rowspan
+        sqlx::query!("INSERT INTO bukkens VALUES ($1, $2, $3)", 
+            bukken.bukken_id, bukken.rent_normal, bukken.rowspan
             )
             .execute(&mut *conn)
             .await?;
@@ -207,13 +202,14 @@ async fn filter_fresh<'a>(conn: &mut sqlx::PgConnection, bukkens: &'a Vec<Bukken
     let mut fresh_bukkens = Vec::new();
 
     for bukken in bukkens {
-        let count = sqlx::query_scalar!(r#"
+        let count = sqlx::query_scalar!("
             SELECT COUNT(*) 
             FROM bukkens 
-            WHERE bukken_id = $1
+            WHERE
+                bukken_id = $1
             AND rent_normal = $2
             AND rowspan = $3
-        "#, 
+        ", 
         bukken.bukken_id,
         bukken.rent_normal,
         bukken.rowspan,
