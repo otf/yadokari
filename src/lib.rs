@@ -57,6 +57,7 @@ struct Bukken {
     access: String,
     tokubetsu_kbn_text: String,
     tokubetsu_kbn: String,
+    rowspan: i32,
     shikutyoson_name: String,
 }
 
@@ -110,10 +111,10 @@ where
     }
 }
 
-fn bukkens_to_blocks(bukkens: &Vec<Bukken>) -> Value {
+fn bukkens_to_blocks(bukkens: Vec<&Bukken>) -> Value {
     let bukken_blocks = bukkens
-        .into_iter()
-        .take(3) // todo: 50ブロックになるように分けて投稿する。
+        .iter()
+        .take(10) // 50ブロックしかSlackに投稿できないので物件数を制限する。
         .flat_map(|bukken| 
             [ json!({ "type": "divider" }),
             json!({
@@ -167,11 +168,58 @@ impl IntoResponse for SlackTask {
     }
 }
 
+async fn refresh_bukkens(conn: &mut sqlx::PgConnection, bukkens: &Vec<Bukken>) -> sqlx::Result<()> {
+    sqlx::query!(r#"TRUNCATE TABLE bukkens"#) 
+        .execute(&mut *conn)
+        .await?;
+    for bukken in bukkens {
+        sqlx::query!(r#"
+            INSERT INTO bukkens
+            VALUES ($1, $2, $3)
+            "#, 
+            bukken.bukken_id, 
+            bukken.rent_normal, 
+            bukken.rowspan
+            )
+            .execute(&mut *conn)
+            .await?;
+    }
+    Ok(())
+}
+
+async fn filter_fresh<'a>(conn: &mut sqlx::PgConnection, bukkens: &'a Vec<Bukken>) -> sqlx::Result<Vec<&'a Bukken>> {
+    let mut fresh_bukkens = Vec::new();
+
+    for bukken in bukkens {
+        let count = sqlx::query_scalar!(r#"
+            SELECT COUNT(*) 
+            FROM bukkens 
+            WHERE bukken_id = $1
+            AND rent_normal = $2
+            AND rowspan = $3
+        "#, 
+        bukken.bukken_id,
+        bukken.rent_normal,
+        bukken.rowspan,
+        )
+            .fetch_one(&mut *conn)
+            .await?;
+        
+        if count == Some(0) {
+            fresh_bukkens.push(bukken);
+        }
+    }
+    Ok(fresh_bukkens)
+}
+
 async fn post_events(state: State<AppState>, ev: Event) -> impl IntoResponse {
     SlackTask(async move {
         if ev.user != state.bot_user {
+            let mut conn = state.pool.acquire().await.unwrap();
             let bukkens = retrieve_bukken_list().await.unwrap();
-            let bukken_blocks = bukkens_to_blocks(&bukkens);
+            let fresh_bukkens = filter_fresh(&mut conn, &bukkens).await.unwrap();
+            refresh_bukkens(&mut conn, &bukkens).await.unwrap();
+            let bukken_blocks = bukkens_to_blocks(fresh_bukkens);
             post_message(&state.bot_user_oauth_token, &ev, &bukken_blocks).await;
         }
     }.boxed())
@@ -194,6 +242,7 @@ async fn post_message(token: &String, ev: &Event, blocks: &Value) {
         .text()
         .await
         .unwrap();
+    tracing::info!("{:#?}", res);
 }
 
 #[shuttle_service::main]
