@@ -1,20 +1,6 @@
 {
   "db": "PostgreSQL",
-  "518d53b72f9a96821c66e027add6920d84e9dcffff6fd3490057b657db3ad531": {
-    "describe": {
-      "columns": [],
-      "nullable": [],
-      "parameters": {
-        "Left": [
-          "Varchar",
-          "Varchar",
-          "Int4"
-        ]
-      }
-    },
-    "query": "INSERT INTO bukkens VALUES ($1, $2, $3)"
-  },
-  "66ed0d78a58f21f109ce1bcd3a2dfc12e5750c368e196d96519b98ca0ef0d401": {
+  "379c6fad0ec113d7c2dd131af6294fedba2125832bdb83590ab4425a92fcc8d7": {
     "describe": {
       "columns": [
         {
@@ -34,7 +20,21 @@
         ]
       }
     },
-    "query": "\n            SELECT COUNT(*) \n            FROM bukkens \n            WHERE\n                bukken_id = $1\n            AND rent_normal = $2\n            AND rowspan = $3\n        "
+    "query": "\n            SELECT COUNT(*) \n            FROM bukkens \n            WHERE (bukken_id, rent_normal, rowspan) = ($1, $2, $3)\n        "
+  },
+  "518d53b72f9a96821c66e027add6920d84e9dcffff6fd3490057b657db3ad531": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "Varchar",
+          "Varchar",
+          "Int4"
+        ]
+      }
+    },
+    "query": "INSERT INTO bukkens VALUES ($1, $2, $3)"
   },
   "675b975ccc51a9f0698455b21a6d0df3eac487fb47f8bb72370e6ba2864accd8": {
     "describe": {

@@ -205,10 +205,7 @@ async fn filter_fresh<'a>(conn: &mut sqlx::PgConnection, bukkens: &'a Vec<Bukken
         let count = sqlx::query_scalar!("
             SELECT COUNT(*) 
             FROM bukkens 
-            WHERE
-                bukken_id = $1
-            AND rent_normal = $2
-            AND rowspan = $3
+            WHERE (bukken_id, rent_normal, rowspan) = ($1, $2, $3)
         ", 
         bukken.bukken_id,
         bukken.rent_normal,
