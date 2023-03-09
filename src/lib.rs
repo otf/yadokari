@@ -5,9 +5,7 @@ use futures::{future::BoxFuture, FutureExt};
 use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use shuttle_secrets::SecretStore;
 use sqlx::PgPool;
-use sync_wrapper::SyncWrapper;
 
 #[derive(Clone)]
 struct AppState {
@@ -255,29 +253,22 @@ async fn post_message(token: &String, ev: &Event, blocks: &Value) {
     tracing::info!("{:#?}", res);
 }
 
-#[shuttle_service::main]
-async fn axum(
-    #[shuttle_shared_db::Postgres(
-        local_uri = "{secrets.DATABASE_URL}"
-    )] pool: PgPool,
-    #[shuttle_secrets::Secrets] secret_store: SecretStore,
-) -> shuttle_service::ShuttleAxum {
-    std::env::set_var("DATABASE_URL", secret_store.get("DATABASE_URL").unwrap());
-    sqlx::migrate!().run(&pool).await.unwrap();
-
+pub fn router(
+    verification_token: String,
+    bot_user_oauth_token: String,
+    bot_user : String,
+    tdfk: String,
+    pool: PgPool,
+) -> Router {
     let app_state = AppState {
         pool,
-        verification_token: secret_store.get("VERIFICATION_TOKEN").unwrap(),
-        bot_user_oauth_token: secret_store.get("BOT_USER_OAUTH_TOKEN").unwrap(),
-        bot_user: secret_store.get("BOT_USER").unwrap(),
-        tdfk: secret_store.get("TDFK").unwrap(),
+        verification_token,
+        bot_user_oauth_token,
+        bot_user,
+        tdfk,
     };
 
-    let router = Router::new()
+    Router::new()
         .route("/events", post(post_events))
-        .with_state(app_state);
-
-    let sync_wrapper = SyncWrapper::new(router);
-
-    Ok(sync_wrapper)
+        .with_state(app_state)
 }

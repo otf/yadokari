@@ -4,19 +4,14 @@ version = "0.1.0"
 edition = "2021"
 publish = false
 
-[lib]
-
 [dependencies]
-shuttle-service = { version = "0.9.0", features = ["web-axum"] }
 axum = "0.6.4"
-sync_wrapper = "0.1.2"
 tokio = { version = "1.22.0", features = ["full"] }
 reqwest = { version = "0.11.14", features = ["json"] }
 serde = { version = "1.0.152", features = ["derive"] }
 serde_json = "1.0.91"
 tracing = "0.1.37"
-shuttle-secrets = "0.9.0"
-shuttle-shared-db = { version = "0.9.0", features = ["postgres", "sqlx"] }
-sqlx = { version = "0.6.2", features = ["postgres", "macros", "offline"] }
+sqlx = { version = "0.6.2", features = ["postgres", "macros", "offline", "runtime-tokio-rustls"] }
 futures = "0.3.26"
 itertools = "0.10.5"
+dotenv = "0.15.0"
