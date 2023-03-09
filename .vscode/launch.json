@@ -22,6 +22,43 @@
             },
             "args": [],
             "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'yadokari'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=yadokari",
+                    "--package=yadokari"
+                ],
+                "filter": {
+                    "name": "yadokari",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in executable 'yadokari'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--bin=yadokari",
+                    "--package=yadokari"
+                ],
+                "filter": {
+                    "name": "yadokari",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
         }
     ]
 }
