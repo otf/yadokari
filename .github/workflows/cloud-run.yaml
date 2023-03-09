@@ -1,0 +1,65 @@
+on:
+  push:
+    branches:
+      - master
+
+  workflow_dispatch:
+
+name: Build and Deploy to Cloud Run
+env:
+  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  SERVICE_NAME: yadokari
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - id: 'auth'
+        name: 'Authenticate to Google Cloud'
+        uses: 'google-github-actions/auth@v1'
+        with:
+          workload_identity_provider: ${{ secrets.WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: github-actions@${{ secrets.GCP_PROJECT_ID }}.iam.gserviceaccount.com
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v1
+        with:
+          version: '>= 420.0.0'
+
+      - name: Authorize Docker push
+        run: gcloud auth configure-docker
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Build and push
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          push: true
+          tags: "asia.gcr.io/${{ env.PROJECT_ID }}/${{ env.SERVICE_NAME }}:${{ github.sha }}"
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Deploy to Cloud Run
+        run: |-
+          gcloud run deploy $SERVICE_NAME \
+            --project=$PROJECT_ID \
+            --image=asia.gcr.io/$PROJECT_ID/$SERVICE_NAME:${{ github.sha }} \
+            --region="asia-northeast1" \
+            --service-account=github-actions@$PROJECT_ID.iam.gserviceaccount.com \
+            --allow-unauthenticated \
+            --add-cloudsql-instances=$PROJECT_ID:asia-northeast1:yadokari \
+            --set-env-vars "DATABASE_URL=${{ secrets.DATABASE_URL }}" \
+            --set-env-vars "VERIFICATION_TOKEN=${{ secrets.VERIFICATION_TOKEN }}" \
+            --set-env-vars "BOT_USER_OAUTH_TOKEN=${{ secrets.BOT_USER_OAUTH_TOKEN }}" \
+            --set-env-vars "BOT_USER=${{ secrets.BOT_USER }}" \
+            --set-env-vars "TDFK=${{ secrets.TDFK }}"
