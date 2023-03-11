@@ -9,19 +9,12 @@ async fn main() {
     dotenv().ok();
     let port = env::var("PORT").expect("PORT must be set").parse().unwrap();
     let db_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
-    let verification_token = env::var("VERIFICATION_TOKEN")
-        .expect("VERIFICATION_TOKEN must be set")
-        .parse()
-        .unwrap();
-    let bot_user_oauth_token = env::var("BOT_USER_OAUTH_TOKEN")
-        .expect("BOT_USER_OAUTH_TOKEN must be set")
-        .parse()
-        .unwrap();
-    let bot_user = env::var("BOT_USER")
-        .expect("BOT_USER must be set")
-        .parse()
-        .unwrap();
-    let tdfk = env::var("TDFK").expect("TDFK must be set").parse().unwrap();
+    let verification_token =
+        env::var("VERIFICATION_TOKEN").expect("VERIFICATION_TOKEN must be set");
+    let bot_user_oauth_token =
+        env::var("BOT_USER_OAUTH_TOKEN").expect("BOT_USER_OAUTH_TOKEN must be set");
+    let bot_user = env::var("BOT_USER").expect("BOT_USER must be set");
+    let tdfk = env::var("TDFK").expect("TDFK must be set");
     let pool = PgPool::connect(&db_url).await.unwrap();
     sqlx::migrate!().run(&pool).await.unwrap();
 
